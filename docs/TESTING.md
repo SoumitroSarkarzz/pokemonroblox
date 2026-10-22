@@ -2,10 +2,14 @@
 
 These checks have **not been run by the cloud agent**. Record actual pass/fail results in your development copy. Keep API tests in a separate private test universe.
 
+## If an older download stays on “Connecting”
+
+Stop Play. Download the latest file from GitHub (the October 22 startup fix), then open that new place rather than your old saved copy. In Explorer, click Workspace and verify its UseMockData attribute is true. Press Play. If startup still fails, select the Server Output and copy the first error; the updated client also reports server startup failures rather than waiting silently. You do not need to publish or enable API access for temporary local testing.
+
 ## 1. Startup and assets
 
 - Open the XML or binary place in Studio; verify all 151 folders in Explorer before Play.
-- Press Play. Confirm no startup errors. A DataStore warning is expected if mock profiles are in use; it is not proof of persistence.
+- Press Play in an unpublished local place with `Workspace.UseMockData=true`. Confirm the lobby, avatar, tutorial and a temporary profile load without API access. Confirm no startup errors. A DataStore warning is expected if mock profiles are in use; it is not proof of persistence.
 - On the server command bar, run `require(game.ServerStorage.StudioChecks).Run()` and require its PASS output.
 - Run the repair utility twice outside Play; verify imported assets are preserved and no folders duplicate.
 - Replace one placeholder with an imported single-part model without PrimaryPart. Start Play and verify root inference, scaling, preview and combat spawning. Repeat with Motor6D and bone rigs using compatible animations.

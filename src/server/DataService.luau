@@ -5,17 +5,32 @@ local Shared=game.ReplicatedStorage.Shared
 local Rules=require(Shared.Rules)
 local Config=require(Shared.Config)
 local Data={Profiles={},Records={},Closing=false}
-local store=DSS:GetDataStore(Config.DataStore)
+local store
+local function getStore()
+ if not store then store=DSS:GetDataStore(Config.DataStore) end
+ return store
+end
 local owner=game.JobId~="" and game.JobId or Http:GenerateGUID(false)
 local function copy(t)
  if type(t)~="table" then return t end
  local out={}; for k,v in pairs(t) do out[k]=copy(v) end; return out
 end
+function Data:IsMockMode()
+ return Run:IsStudio() and workspace:GetAttribute("UseMockData")==true
+end
 function Data:Load(player)
+ -- Explicit Studio test mode must not open a DataStore: even GetDataStore can
+ -- throw for an unpublished place, before an UpdateAsync pcall is reached.
+ if self:IsMockMode() then
+  warn("[Data] Studio mock profile; progress will NOT persist (UseMockData=true).")
+  self.Records[player]={Mock=true}; self.Profiles[player]=Rules.NewProfile()
+  if not player.Parent then self:Remove(player); return nil end
+  return self.Profiles[player]
+ end
  local key="u_"..player.UserId
  local record
  local ok,err=pcall(function()
-  record=store:UpdateAsync(key,function(old)
+  record=getStore():UpdateAsync(key,function(old)
    old=old or {Profile=Rules.NewProfile()}
    if type(old)~="table" or type(old.Profile)~="table" or old.Profile.Version~=Config.Version then return nil end
    local defaults=Rules.NewProfile()
@@ -28,11 +43,6 @@ function Data:Load(player)
   end)
  end)
  if not ok or not record or not record.Lease or record.Lease.Owner~=owner then
-  -- Deliberately opt-in, never save fabricated defaults over a failed load.
-  if Run:IsStudio() and workspace:GetAttribute("UseMockData")==true and not ok then
-   warn("[Data] Studio mock profile; progress will NOT persist: "..tostring(err))
-   self.Records[player]={Mock=true}; self.Profiles[player]=Rules.NewProfile(); return self.Profiles[player]
-  end
   player:Kick("Your data could not be loaded safely. Please rejoin shortly."); return nil
  end
  local profile=record.Profile
@@ -55,7 +65,7 @@ function Data:Save(player,release)
  state.Busy=true
  local snapshot=copy(profile); local saved=false
  local ok,err=pcall(function()
-  store:UpdateAsync(state.Key,function(old)
+  getStore():UpdateAsync(state.Key,function(old)
    saved=false -- UpdateAsync may retry this callback after a concurrent write.
    if not old or not old.Lease or old.Lease.Owner~=owner then return nil end
    old.Profile=snapshot

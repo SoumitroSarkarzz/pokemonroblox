@@ -20,9 +20,11 @@ try {
  for(const name of ['Kanto','Config','Rules','PokemonDatabase','AbilityDatabase','PokemonModelSettings']) {
   harness+=`\nmodules["${name}"]=(function()\n${await readFile(join(root,`src/shared/${name}.luau`),'utf8')}\nend)()\n`;
  }
- for(const name of ['EconomyService','MatchmakingService','CombatService','MatchService','DataService']) {
+ for(const name of ['EconomyService','MatchmakingService','CombatService','MatchService','DataService','LeaderboardService']) {
   harness+=`\nmodules["${name}"]=(function()\n${await readFile(join(root,`src/server/${name}.luau`),'utf8')}\nend)()\n`;
  }
  harness+=await readFile(join(root,'tests/spec.luau'),'utf8');
  await state.loadstring(harness,'domain-tests',true)();
+ const clientTest=(await readFile(join(root,'tests/client_startup.luau'),'utf8')).replace('-- BOOTSTRAP --',await readFile(join(root,'src/client/Bootstrap.client.luau'),'utf8'));
+ await state.loadstring(clientTest,'client-startup-regression',true)();
 } finally {state.destroy();}

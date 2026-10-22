@@ -42,6 +42,11 @@ local pending={}
 local task={spawn=function(fn) table.insert(pending,fn) end,delay=function(_,fn) table.insert(pending,fn) end,wait=function(dt) clock+=dt or .03 end}
 local records={}
 local mockFailure=false
+local storeOpenFailure=true
+local storeOpens=0
+local orderedStoreOpens=0
+local studio=false
+local mockMode=false
 local store={UpdateAsync=function(_,key,fn)
  if mockFailure then error("DataStore offline") end
  local record=records[key]
@@ -50,13 +55,17 @@ local store={UpdateAsync=function(_,key,fn)
  return nil
 end}
 local game={JobId="test-job",ReplicatedStorage={Shared=refs},Players={GetPlayers=function() return {} end},GetService=function(_,name)
- if name=="DataStoreService" then return {GetDataStore=function() return store end} end
- if name=="RunService" then return {IsStudio=function() return false end} end
+ if name=="DataStoreService" then return {GetDataStore=function()
+  storeOpens+=1
+  if storeOpenFailure then error("You must publish this place to access DataStore") end
+  return store
+ end,GetOrderedDataStore=function() orderedStoreOpens+=1; error("No live API in test") end} end
+ if name=="RunService" then return {IsStudio=function() return studio end} end
  if name=="HttpService" then return {GenerateGUID=function() return "test-id" end} end
  return {}
 end}
 local wall=false
-local workspace={GetAttribute=function() return false end,Raycast=function(_,origin,delta) if wall then return {Position=origin+delta*.5} end end}
+local workspace={GetAttribute=function() return mockMode end,Raycast=function(_,origin,delta) if wall then return {Position=origin+delta*.5} end end}
 local function flush()
  local batch=pending; pending={}
  for _,fn in ipairs(batch) do fn() end

@@ -1,13 +1,17 @@
 local Players=game:GetService("Players")
 local Run=game:GetService("RunService")
+local replicated=game:GetService("ReplicatedStorage")
 Players.CharacterAutoLoads=false
-local Shared=game.ReplicatedStorage.Shared
+replicated:SetAttribute("ServerStartupStatus","Starting")
+replicated:SetAttribute("ServerStartupError",nil)
+local remotes=replicated:FindFirstChild("Remotes") or Instance.new("Folder",replicated); remotes.Name="Remotes"
+local intent=remotes:FindFirstChild("Intent") or Instance.new("RemoteEvent",remotes); intent.Name="Intent"
+local event=remotes:FindFirstChild("State") or Instance.new("RemoteEvent",remotes); event.Name="State"
+local function start()
+local Shared=replicated.Shared
 local Config=require(Shared.Config)
 local Rules=require(Shared.Rules)
 local assets=require(Shared.AssetSetup); assets.Run()
-local remotes=game.ReplicatedStorage:FindFirstChild("Remotes") or Instance.new("Folder",game.ReplicatedStorage); remotes.Name="Remotes"
-local intent=Instance.new("RemoteEvent"); intent.Name="Intent"; intent.Parent=remotes
-local event=Instance.new("RemoteEvent"); event.Name="State"; event.Parent=remotes
 local Data=require(script.Parent.DataService)
 local Economy=require(script.Parent.EconomyService)
 local Creatures=require(script.Parent.CreatureService)
@@ -28,6 +32,7 @@ World.OnStation=function(player,name)
 end
 local function join(player)
  local p=Data:Load(player); if not p or not player.Parent then return end
+ event:FireClient(player,"Profile",Data:Public(player))
  player.CharacterAdded:Connect(function(character)
   local hum=character:FindFirstChildOfClass("Humanoid")
   if hum then hum.Died:Connect(function() task.delay(2,function() if player.Parent and not Matches.ByPlayer[player] then player:LoadCharacter() end end) end) end
@@ -43,8 +48,15 @@ local function join(player)
  player.CharacterAdded:Connect(nametag)
  player:LoadCharacter()
 end
-Players.PlayerAdded:Connect(join)
-for _,p in ipairs(Players:GetPlayers()) do task.spawn(join,p) end
+local function safeJoin(player)
+ local ok,err=xpcall(function() join(player) end,debug.traceback)
+ if not ok then
+  warn("[Startup] Player load failed: "..tostring(err))
+  if player.Parent then player:Kick("Player initialization failed. Check the Server Output in Studio.") end
+ end
+end
+Players.PlayerAdded:Connect(safeJoin)
+for _,p in ipairs(Players:GetPlayers()) do task.spawn(safeJoin,p) end
 Players.PlayerRemoving:Connect(function(player)
  Queue:Leave(player); Matches:Leave(player,true); Boards:Publish(player); Data:Remove(player); rates[player]=nil; actionAt[player]=nil
 end)
@@ -54,7 +66,10 @@ intent.OnServerEvent:Connect(function(player,action,payload)
  if not bucket then bucket={Tokens=80,At=now}; rates[player]=bucket end
  bucket.Tokens=math.min(80,bucket.Tokens+(now-bucket.At)*50); bucket.At=now
  if bucket.Tokens<1 then return end; bucket.Tokens-=1
- if not Data:Get(player) then return end
+ if not Data:Get(player) then
+  if action=="Ready" then event:FireClient(player,"ProfileStatus","Loading your profile…") end
+  return
+ end
  if type(payload)~="table" then payload={} end
  local actor=Matches.ByPlayer[player]
  if action=="Move" then if actor then Combat:Move(actor,payload.Direction,payload.Jump) end; return end
@@ -115,3 +130,12 @@ Run.Heartbeat:Connect(function(dt)
  if boardTimer>=120 then boardTimer=0; for player in pairs(Data.Profiles) do Boards:Publish(player) end; task.spawn(function() Boards:Refresh() end) end
 end)
 task.spawn(function() Boards:Refresh() end)
+
+replicated:SetAttribute("ServerStartupStatus","Ready")
+end
+local ok,err=xpcall(start,debug.traceback)
+if not ok then
+ replicated:SetAttribute("ServerStartupStatus","Failed")
+ replicated:SetAttribute("ServerStartupError",tostring(err))
+ warn("[Startup] Server initialization failed:\n"..tostring(err))
+end

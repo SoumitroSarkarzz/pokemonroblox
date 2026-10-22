@@ -2,6 +2,7 @@ local DSS=game:GetService("DataStoreService")
 local Boards={Cache={},Last=0}
 function Boards:Init(data) self.Data=data end
 function Boards:Publish(player)
+ if self.Data:IsMockMode() then return end
  local p=self.Data:Get(player); if not p then return end
  for _,name in ipairs({"MMR","Wins","BestWinStreak"}) do
   local value=p[name]
@@ -9,6 +10,7 @@ function Boards:Publish(player)
  end
 end
 function Boards:Refresh()
+ if self.Data:IsMockMode() then self.Cache={MMR={},Wins={},BestWinStreak={}}; return end
  local result={}
  for _,name in ipairs({"MMR","Wins","BestWinStreak"}) do
   local ok,pages=pcall(function() return DSS:GetOrderedDataStore("KantoArena_"..name):GetSortedAsync(false,10) end)

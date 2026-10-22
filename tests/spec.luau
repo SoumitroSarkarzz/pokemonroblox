@@ -78,6 +78,21 @@ local combat=modules.CombatService
 check(not combat:Attack(nil,1,{}),"Malformed aim rejected")
 check(not combat:Switch(nil,1,false),"Missing actor rejected")
 local persistence=modules.DataService
+check(storeOpens==0,"Importing DataService must not open a DataStore")
+studio=true; mockMode=true
+local localPlayer={UserId=126,Parent=true,Kick=player.Kick}
+local mockProfile=persistence:Load(localPlayer)
+check(mockProfile~=nil and persistence.Records[localPlayer].Mock,"Unpublished Studio opens a temporary profile")
+check(storeOpens==0 and persistence:Save(localPlayer,false),"Studio mock loading/saving never contacts DataStore")
+local boards=modules.LeaderboardService; boards:Init(persistence); boards:Publish(localPlayer); boards:Refresh()
+check(orderedStoreOpens==0,"Studio mock leaderboards never contact live API")
+persistence:Remove(localPlayer)
+check(persistence:Get(localPlayer)==nil,"Studio mock session cleans up")
+studio=false
+local deniedPlayer={UserId=127,Parent=true,Kick=player.Kick}
+check(persistence:Load(deniedPlayer)==nil and deniedPlayer.Kicked~=nil,"Production never uses mock profiles even when flag is enabled")
+check(records.u_127==nil,"Store-open failure never creates replacement data")
+mockMode=false; storeOpenFailure=false
 local loaded=persistence:Load(player)
 check(loaded~=nil and records.u_123.Lease.Owner=="test-job","Data lease acquired")
 loaded.Coins=42

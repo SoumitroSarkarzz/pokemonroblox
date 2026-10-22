@@ -5,7 +5,9 @@ local Input={}
 function Input:Init(ui,intent)
  self.UI=ui; self.Intent=intent
  local player=Players.LocalPlayer
- local controls=require(player.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
+ local playerModule=player.PlayerScripts:WaitForChild("PlayerModule",10)
+ assert(playerModule,"Roblox PlayerModule did not load; profile UI remains available")
+ local controls=require(playerModule):GetControls()
  local lastMove=0; local jump=false
  local function aim()
   local cam=workspace.CurrentCamera

@@ -17,7 +17,7 @@ Open `KantoArena.rbxl` in Roblox Studio. The ZIP includes source code, documenta
 4. Use Studio's **Server & Clients** test with two clients to enter the same Casual 1v1 circle. Both must stay for the full 10-second countdown.
 5. In Play, switch the command bar to **Server** and run `require(game.ServerStorage.StudioChecks).Run()`.
 
-The generated place opts into temporary Studio mock profiles **only if** DataStore access fails. The Output window explicitly identifies mock sessions. Nothing from mock sessions is saved. Published servers never use mock data; failed loads deny entry instead of overwriting existing profiles. To test real persistence, publish a private test experience, enable Studio API access for that test experience, set `Workspace.UseMockData` to false, and follow [the test checklist](docs/TESTING.md). Use a separate test universe to protect production data.
+The generated place sets `Workspace.UseMockData=true`: Studio immediately uses temporary test profiles without opening any DataStore or leaderboard API. This works in unpublished local places. The Output window explicitly identifies mock sessions. Nothing from mock sessions is saved. Published servers never use mock data; failed loads deny entry instead of overwriting existing profiles. To test real persistence, publish a private test experience, enable Studio API access for that test experience, set `Workspace.UseMockData` to false, and follow [the test checklist](docs/TESTING.md). Use a separate test universe to protect production data.
 
 ## Build and validate in the cloud
 

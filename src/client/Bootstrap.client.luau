@@ -6,9 +6,10 @@ local Input=require(script.Parent.InputController)
 local Camera=require(script.Parent.CameraController)
 local VFX=require(script.Parent.VFXController)
 local Creatures=require(script.Parent.CreatureController)
-UI:Init(intent); Input:Init(UI,intent); Camera:Init(UI); VFX:Init(UI); Creatures:Init(UI)
+UI:Init(intent)
 state.OnClientEvent:Connect(function(kind,payload)
  if kind=="Profile" and payload then UI:ProfileChanged(payload)
+ elseif kind=="ProfileStatus" and not UI.Profile then UI.Stats.Text=payload
  elseif kind=="Match" then UI:UpdateMatch(payload)
  elseif kind=="Lobby" then UI:Lobby()
  elseif kind=="Open" then UI:Open(payload)
@@ -21,4 +22,28 @@ state.OnClientEvent:Connect(function(kind,payload)
 end)
 task.spawn(function()
  while not UI.Profile do intent:FireServer("Ready"); task.wait(1) end
+end)
+
+local function startupStatus()
+ local err=game.ReplicatedStorage:GetAttribute("ServerStartupError")
+ if err and not UI.Profile then
+  UI.Stats.Text="Server startup failed • check Server Output"
+  UI:Toast("Server startup failed. Open Studio Output and select Server.")
+  warn("[Startup] Server error: "..tostring(err))
+ end
+end
+game.ReplicatedStorage:GetAttributeChangedSignal("ServerStartupError"):Connect(startupStatus)
+startupStatus()
+-- Input/PlayerModule readiness must never block the profile subscription or handshake.
+for _,entry in ipairs({{Input,"Input",true},{Camera,"Camera"},{VFX,"VFX"},{Creatures,"Creatures"}}) do
+ task.spawn(function()
+  local ok,err=pcall(function() entry[1]:Init(UI,entry[3] and intent or nil) end)
+  if not ok then warn("[Startup] "..entry[2].." controller failed: "..tostring(err)) end
+ end)
+end
+task.delay(30,function()
+ if not UI.Profile then
+  UI.Stats.Text="Profile unavailable • check Server Output"
+  UI:Toast("Profile did not load. Open Studio Output and copy the first red server error.")
+ end
 end)
