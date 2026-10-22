@@ -17,4 +17,6 @@ with zipfile.ZipFile(out / 'KantoArena.zip', 'w', zipfile.ZIP_DEFLATED) as archi
                 archive.write(file, 'KantoArena/' + str(file.relative_to(root)))
 with zipfile.ZipFile(out / 'KantoArena.zip') as archive:
     assert archive.testzip() is None, 'Corrupt ZIP'
+shutil.copy2(out / 'KantoArena.rbxl', out / 'KantoArena-Polish.rbxl')
+shutil.copy2(out / 'KantoArena.zip', out / 'KantoArena-Polish.zip')
 print('Packaged releases/KantoArena.rbxl and releases/KantoArena.zip')

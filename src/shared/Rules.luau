@@ -22,7 +22,7 @@ function Rules.Winner(a,b)
 end
 function Rules.NewProfile()
  return {Version=1,Level=1,XP=0,Coins=0,MMR=600,RankTier="Gold",Wins=0,Losses=0,WinStreak=0,BestWinStreak=0,MatchesPlayed=0,
-  Owned={},Team={},Crates={Starter=3,Basic=0,Rare=0,Event=0},Potions=0,Cosmetics={},Settings={Music=true,Effects=true,ShiftLock=false},Daily={Day=0,Streak=0},Tutorial=false,Favorites={},AppliedMatches={}}
+  Owned={},Team={},Crates={Starter=3,Basic=0,Rare=0,Event=0},Potions=0,Cosmetics={},Settings={Music=true,Effects=true,ShiftLock=false,CameraShake="Low",Graphics="Medium"},Daily={Day=0,Streak=0},Tutorial=false,Favorites={},AppliedMatches={}}
 end
 function Rules.Search(entry,query)
  local hay=string.lower(table.concat({tostring(entry.ID),string.format("%03d",entry.ID),entry.Name,entry.Type1,entry.Type2 or "",entry.Rarity,entry.Role}," "))

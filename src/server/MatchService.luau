@@ -8,16 +8,30 @@ end
 function Matches:Broadcast(match,kind,payload)
  for _,actor in ipairs(match.Actors) do if actor.Player and actor.Player.Parent then self.Event:FireClient(actor.Player,kind,payload) end end
 end
-function Matches:Snapshot(match)
- local payload={ID=match.ID,Phase=match.Phase,Mode=match.Mode,Remaining=math.max(0,math.ceil(match.EndsAt-os.clock())),Actors={},SuddenDeath=match.SuddenDeath,Training=match.Training}
+function Matches:Snapshot(match,viewer)
+ local payload={ID=match.ID,Phase=match.Phase,Mode=match.Mode,Remaining=math.max(0,math.ceil(match.EndsAt-os.clock())),Actors={},SuddenDeath=match.SuddenDeath,Training=match.Training,Ranked=match.Ranked}
  for _,actor in ipairs(match.Actors) do
   local cooldowns={}
-  for key,ending in pairs(actor.Cooldowns[actor.Active]) do cooldowns[key]=math.max(0,ending-os.clock()) end
-  table.insert(payload.Actors,{ID=actor.ID,Name=actor.Name,Side=actor.Side,Team=actor.Team,Health=actor.Health,Active=actor.Active,Switches=actor.Switches,Potions=actor.Potions,Eliminated=actor.Eliminated,Cooldowns=cooldowns,Stamina=actor.Stamina})
+  if not viewer or actor.Player==viewer then
+   for key,ending in pairs(actor.Cooldowns[actor.Active]) do cooldowns[key]=math.max(0,ending-os.clock()) end
+  end
+  local statuses={}
+  local profile=actor.Player and self.Data:Get(actor.Player)
+  local progress=profile and profile.Owned[tostring(actor.Team[actor.Active])]
+  local level=progress and progress.Level or 1
+  if os.clock()<(actor.ShieldUntil or 0) then table.insert(statuses,"WARD") end
+  if os.clock()<(actor.StunnedUntil or 0) then table.insert(statuses,"STUN") end
+  if actor.Guarding then table.insert(statuses,"GUARD") end
+  if actor.Switching then table.insert(statuses,"SWITCHING") end
+  table.insert(payload.Actors,{ID=actor.ID,Name=actor.Name,Side=actor.Side,Team=actor.Team,Health=actor.Health,Active=actor.Active,Switches=actor.Switches,Potions=actor.Potions,Eliminated=actor.Eliminated,Cooldowns=cooldowns,Stamina=actor.Stamina,Statuses=statuses,Level=level,Stats=actor.Stats})
  end
  return payload
 end
-function Matches:SendState(match) self:Broadcast(match,"Match",self:Snapshot(match)) end
+function Matches:SendState(match)
+ for _,actor in ipairs(match.Actors) do
+  if actor.Player and actor.Player.Parent then self.Event:FireClient(actor.Player,"Match",self:Snapshot(match,actor.Player)) end
+ end
+end
 function Matches:Start(players,mode,options)
  local config=Config.Modes[mode]; if not config then return false end
  for _,player in ipairs(players) do
@@ -27,7 +41,7 @@ function Matches:Start(players,mode,options)
  self.Serial=1
  while self.World.Arenas:FindFirstChild("Arena_"..self.Serial) do self.Serial+=1 end
  local folder,actorsFolder,center,radius=self.World:CreateArena(self.Serial,config.Size)
- local match={ID=Http:GenerateGUID(false),Mode=mode,Ranked=config.Ranked,Practice=config.Practice,Training=options and options.Training,Actors={},Folder=folder,ActorsFolder=actorsFolder,Center=center,Radius=radius,Phase="Preview",EndsAt=os.clock()+Config.PreviewSeconds,Duration=config.Duration,Difficulty=options and options.Difficulty or "Normal"}
+ local match={ID=Http:GenerateGUID(false),Mode=mode,Ranked=config.Ranked,Practice=config.Practice,Training=options and options.Training,Actors={},Folder=folder,ActorsFolder=actorsFolder,Center=center,Radius=radius,StartedAt=os.clock(),Phase="Preview",EndsAt=os.clock()+Config.PreviewSeconds,Duration=config.Duration,Difficulty=options and options.Difficulty or "Normal"}
  self.Active[match.ID]=match
  local sorted=table.clone(players)
  table.sort(sorted,function(a,b) return self.Data:Get(a).MMR>self.Data:Get(b).MMR end)
@@ -61,6 +75,7 @@ function Matches:Defeat(actor,deferWinner)
  if actor.Dummy then
   actor.Health={100,100,100}; actor.Humanoid.Health=100; return
  end
+ self:Broadcast(actor.Match,"Effect",{ActorID=actor.ID,Name="Defeat",PokemonID=actor.Team[actor.Active],Position=actor.Root.Position,Extra={HasReplacement=replacement~=nil}})
  self:Broadcast(actor.Match,"Announcement",actor.Name.."'s creature was defeated")
  if replacement then
   self.Combat:Switch(actor,replacement,true)
@@ -92,14 +107,18 @@ function Matches:CheckWinner(match,timer)
 end
 function Matches:Finish(match,winner)
  if match.Phase=="Results" then return end
- match.Phase="Results"; match.EndsAt=os.clock()+7
+ match.Phase="Results"; match.EndsAt=os.clock()+10
  for _,actor in ipairs(match.Actors) do
   if actor.Root then actor.Root.Anchored=true end
   if actor.Player then
    local total,count=0,0
    for _,other in ipairs(match.Actors) do if other.Side~=actor.Side then total+=other.MMR; count+=1 end end
+   local before=self.Data:Get(actor.Player)
+   local oldCoins,oldXP,oldMMR=before.Coins,before.XP,before.MMR
    if winner~=0 then self.Economy:Reward(actor.Player,match,actor.Side==winner,total/math.max(count,1)) end
-   self.Event:FireClient(actor.Player,"Result",{Won=actor.Side==winner,Draw=winner==0,Practice=match.Practice})
+   self.Event:FireClient(actor.Player,"Result",{Won=actor.Side==winner,Draw=winner==0,Practice=match.Practice,
+    PokemonID=actor.Team[actor.Active],Team=actor.Team,Name=actor.Name,Rank=before.RankTier,MMR=before.MMR,
+    Coins=before.Coins-oldCoins,XP=before.XP-oldXP,Rating=before.MMR-oldMMR,Stats=actor.Stats or {},Duration=math.floor(os.clock()-(match.StartedAt or os.clock()))})
    self.Event:FireClient(actor.Player,"Profile",self.Data:Public(actor.Player))
    task.spawn(function() self.Data:Save(actor.Player,false) end)
   end

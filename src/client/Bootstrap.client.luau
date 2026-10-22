@@ -6,6 +6,7 @@ local Input=require(script.Parent.InputController)
 local Camera=require(script.Parent.CameraController)
 local VFX=require(script.Parent.VFXController)
 local Creatures=require(script.Parent.CreatureController)
+local Scene=require(script.Parent.SceneController)
 UI:Init(intent)
 state.OnClientEvent:Connect(function(kind,payload)
  if kind=="Profile" and payload then UI:ProfileChanged(payload)
@@ -17,8 +18,12 @@ state.OnClientEvent:Connect(function(kind,payload)
  elseif kind=="Queue" then UI:Queue(payload)
  elseif kind=="Leaderboards" then UI.Boards=payload
  elseif kind=="Crate" then task.delay(.1,function() UI:Reveal(payload) end)
- elseif kind=="Effect" then VFX:Play(payload); Creatures:Effect(payload)
- elseif kind=="Result" then UI:Toast((payload.Draw and "DRAW" or payload.Won and "VICTORY" or "DEFEAT")..(payload.Draw and " • No rating change" or payload.Practice and " • Practice complete" or " • Rewards added").." • Returning to lobby…") end
+ elseif kind=="Effect" then
+  VFX:Play(payload); Creatures:Effect(payload)
+  if payload.Name=="Hit" then UI.Presentation:Hit(payload)
+  elseif payload.Extra and payload.Extra.Slot==4 then UI.Presentation:Ultimate(payload)
+  elseif payload.Name=="Defeat" then UI.Presentation:Banner("CREATURE DEFEATED",require(game.ReplicatedStorage.Shared.UITheme).Danger,.7) end
+ elseif kind=="Result" then UI:ShowResults(payload) end
 end)
 task.spawn(function()
  while not UI.Profile do intent:FireServer("Ready"); task.wait(1) end
@@ -35,7 +40,7 @@ end
 game.ReplicatedStorage:GetAttributeChangedSignal("ServerStartupError"):Connect(startupStatus)
 startupStatus()
 -- Input/PlayerModule readiness must never block the profile subscription or handshake.
-for _,entry in ipairs({{Input,"Input",true},{Camera,"Camera"},{VFX,"VFX"},{Creatures,"Creatures"}}) do
+for _,entry in ipairs({{Input,"Input",true},{Camera,"Camera"},{VFX,"VFX"},{Creatures,"Creatures"},{Scene,"Scene"}}) do
  task.spawn(function()
   local ok,err=pcall(function() entry[1]:Init(UI,entry[3] and intent or nil) end)
   if not ok then warn("[Startup] "..entry[2].." controller failed: "..tostring(err)) end

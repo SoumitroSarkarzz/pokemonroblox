@@ -23,7 +23,7 @@ local function warn() warnings+=1 end
 local refs=setmetatable({},{__index=function(_,key) return key end})
 local script={Parent=refs}
 local controllers={UIController=UI,InputController={Init=function() error("PlayerModule unavailable") end},
- CameraController={Init=function() end},VFXController={Init=function() end},CreatureController={Init=function() end}}
+ CameraController={Init=function() end},VFXController={Init=function() end},CreatureController={Init=function() end},SceneController={Init=function() end}}
 local function require(key) return assert(controllers[key],key) end
 local task={spawn=function(fn) fn() end,wait=function() end,delay=function() end}
 local function run()

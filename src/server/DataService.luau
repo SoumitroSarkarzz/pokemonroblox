@@ -16,13 +16,13 @@ local function copy(t)
  local out={}; for k,v in pairs(t) do out[k]=copy(v) end; return out
 end
 function Data:IsMockMode()
- return Run:IsStudio() and workspace:GetAttribute("UseMockData")==true
+ return Run:IsStudio() and workspace:GetAttribute("UseMockData")~=false
 end
 function Data:Load(player)
  -- Explicit Studio test mode must not open a DataStore: even GetDataStore can
  -- throw for an unpublished place, before an UpdateAsync pcall is reached.
  if self:IsMockMode() then
-  warn("[Data] Studio mock profile; progress will NOT persist (UseMockData=true).")
+  warn("[Data] Studio mock profile; progress will NOT persist (Studio test mode; set UseMockData=false for real API tests).")
   self.Records[player]={Mock=true}; self.Profiles[player]=Rules.NewProfile()
   if not player.Parent then self:Remove(player); return nil end
   return self.Profiles[player]
@@ -43,6 +43,7 @@ function Data:Load(player)
   end)
  end)
  if not ok or not record or not record.Lease or record.Lease.Owner~=owner then
+  warn("[Data] Profile load rejected for "..player.UserId..": "..tostring(err or "lease conflict or unsupported profile schema"))
   player:Kick("Your data could not be loaded safely. Please rejoin shortly."); return nil
  end
  local profile=record.Profile

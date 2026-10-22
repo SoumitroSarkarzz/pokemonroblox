@@ -24,8 +24,9 @@ local sources=0
 for _,node in ipairs(root:GetDescendants()) do
  if node.ClassName=='ModuleScript' or node.ClassName=='Script' or node.ClassName=='LocalScript' then sources=sources+1 end
 end
-assert(sources==31,'Lost embedded sources')
+assert(sources==40,'Lost embedded sources')
 fs.write('build/KantoArena.rbxl',root)
 local binary=fs.read('build/KantoArena.rbxl')
 assert(#path(binary,'ReplicatedStorage','Pokemon','Models'):GetChildren()==151,'Binary round trip failed')
+assert(path(binary,'Workspace'):GetAttribute('UseMockData')==true,'Binary lost Studio mock flag')
 print('PASS: Roblox XML decoded; 151 asset trees and attributes verified; binary place round trip passed')

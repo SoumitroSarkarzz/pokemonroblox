@@ -173,10 +173,10 @@ check(combat:Attack(a,1,Vector3.new(0,0,-1)),"Projectile accepted after cooldown
 flush()
 check(b.Health[3]==100,"Projectile does not instantly claim target damage")
 combat:Step(.1); combat:Step(.1); combat:Step(.1)
-check(b.Health[3]==88 and #combat.Projectiles==0,"Server swept projectile hits once at authoritative position")
+check(b.Health[3]==90 and #combat.Projectiles==0,"Server swept projectile hits once at authoritative position")
 clock+=10; wall=true
 combat:Attack(a,1,Vector3.new(0,0,-1)); flush(); combat:Step(.1)
-check(b.Health[3]==88 and #combat.Projectiles==0,"Wall terminates projectile before enemy")
+check(b.Health[3]==90 and #combat.Projectiles==0,"Wall terminates projectile before enemy")
 wall=false
 clock+=10
 b.Root.Position=Vector3.new(0,0,-5); b.Health[3]=100
@@ -188,4 +188,99 @@ check(b.Health[3]<hp,"Ground slam applies authoritative area damage")
 a.Humanoid.FloorMaterial=nil; clock+=1; a.BasicCombo=3; a.LastBasic=clock
 combat:Attack(a,0,Vector3.new(0,0,-1)); flush()
 check(b.Root.AssemblyLinearVelocity.Y==27,"Fourth basic hit launches target")
+-- Detailed move metadata and backward compatibility.
+local fields={"MoveID","Name","DisplayName","Description","Type","Category","Damage","Cooldown","StartupTime","ActiveTime","EndLag","Range","ProjectileSpeed","AOERadius","Knockback","VerticalKnockback","StunTime","Hitstop","HitboxType","HitboxSize","MovementLock","CanUseInAir","CanCancel","ComboStarter","ComboExtender","ComboFinisher","ArmorFrames","InvulnerabilityFrames","StatusEffect","StatusDuration","VFX","Sound","Animation","CameraShake","CameraFOVEffect"}
+for key,move in pairs(modules.MoveDatabase) do
+ for _,field in ipairs(fields) do check(move[field]~=nil,key.." missing "..field) end
+ check(move.Startup==move.StartupTime and move.Endlag==move.EndLag and move.Stun==move.StunTime,"Legacy timing adapter stays consistent")
+ check(move.Hitstop<=.08 and move.Hitstop>=0,"Visual hitstop stays bounded")
+end
+check(modules.AbilityDatabase.Pulse==modules.MoveDatabase.Pulse,"Legacy move keys preserved")
+for _,entry in ipairs(DB) do check(modules.MoveDatabase[entry.Abilities[1]].Type==entry.Type1,"Elemental catalogue binding") end
+-- Missing Workspace attribute must not break local unpublished Studio testing.
+studio=true; mockMode=nil
+local missingFlag={UserId=180,Parent=true,Kick=player.Kick}
+local opensBefore=storeOpens
+check(persistence:Load(missingFlag)~=nil and storeOpens==opensBefore,"Missing Studio attribute defaults to temporary profiles")
+persistence:Remove(missingFlag); studio=false; mockMode=false
+-- Actual queue/match services through each mode: countdown cancellation, battle,
+-- elimination, rewards, results and lobby return. Engine physics is not mocked as passing.
+local matches=modules.MatchService
+local matchEconomy=modules.EconomyService
+for _,mode in ipairs({"Casual1","Ranked1","Casual2","Ranked2","Casual3","Ranked3","Practice"}) do
+ local cfg=Config.Modes[mode]; local profiles={}; local players={}; local sent={}
+ local dataService={Get=function(_,p) return profiles[p] end,Public=function(_,p) return profiles[p] end,Save=function() return true end}
+ local world={Arenas={FindFirstChild=function() return nil end},Screens={},Pads={},CreateArena=function()
+  return {Destroy=function(self) self.Destroyed=true end},{},Vector3.zero,55
+ end}
+ for key in pairs(Config.Modes) do world.Screens[key]={}; world.Pads[key]=Vector3.zero end
+ local creatures={Spawn=function(_,actor,_,cf)
+  actor.Character={Destroy=function() end,GetDescendants=function() return {} end}; actor.Root={Position=cf.Position,CFrame=cf,AssemblyLinearVelocity=Vector3.zero}; actor.Humanoid={Health=100,Move=function() end}; return actor.Character
+ end}
+ for i=1,(cfg.Practice and 1 or cfg.Size*2) do
+  local p={UserId=1000+i,Name="Player"..i,DisplayName="Player"..i,Parent=true,LoadCharacter=function(self) self.Respawns=(self.Respawns or 0)+1 end}
+  local profile=Rules.NewProfile(); profile.Team={1,4,7}; profile.Owned={['1']={Level=1,Mastery=0},['4']={Level=1,Mastery=0},['7']={Level=1,Mastery=0}}; profiles[p]=profile; table.insert(players,p)
+ end
+ local event={FireClient=function(_,p,kind,payload) table.insert(sent,{Player=p,Kind=kind,Data=payload}) end}
+ matches.Active={}; matches.ByPlayer={}; matches:Init(dataService,matchEconomy,creatures,world,event); matchEconomy:Init(dataService)
+ combat:Init(matches,event); matches.Combat=combat
+ queue.Membership={}; queue:Init(dataService,matches,world,event)
+ for _,p in ipairs(players) do check(queue:Join(p,mode,{Difficulty="Hard"}),"Queue accepts valid team for "..mode) end
+ if not cfg.Practice then
+  queue:Step(.2); check(queue.Queues[mode].Countdown~=nil,"Full mode starts countdown")
+  clock+=5; queue:Leave(players[1]); check(queue.Queues[mode].Countdown==nil,"Leaving cancels countdown")
+  queue:Join(players[1],mode); queue:Step(.2); clock+=10; queue:Step(.2)
+ end
+ local match=next(matches.Active) and select(2,next(matches.Active))
+ check(match~=nil and match.Phase=="Preview","Mode creates preview: "..mode)
+ local count={0,0}; for _,a in ipairs(match.Actors) do count[a.Side]+=1 end
+ check(count[1]==cfg.Size and count[2]==cfg.Size,"Balanced team sizes for "..mode)
+ clock+=3; matches:Step(3); check(match.Phase=="Battle","Preview becomes battle")
+ local viewer=players[1]; local own=matches.ByPlayer[viewer]; own.Cooldowns[1].GrassPulse=clock+3
+ local snapshot=matches:Snapshot(match,viewer)
+ for _,a in ipairs(snapshot.Actors) do
+  check(a.ID==own.ID or next(a.Cooldowns)==nil,"Snapshot does not expose another player's cooldowns")
+ end
+ if mode=="Casual1" then
+  players[2].Parent=false; matches:Leave(players[2],true)
+  check(profiles[players[2]].Losses==1,"Disconnect applies one forfeit loss")
+ elseif mode=="Ranked1" then
+  matches:Leave(players[2],false)
+  check(profiles[players[2]].Losses==1,"Leave Match applies one forfeit loss")
+ elseif mode=="Practice" then
+  local bots=modules.BotService; bots:Init(matches,combat); bots:Step(.1)
+  check(match.Actors[2].NextThink~=nil,"Practice bot executes its decision path")
+ end
+ for _,a in ipairs(match.Actors) do
+  if a.Side==2 then a.Health={0,0,0}; matches:Defeat(a) end
+ end
+ check(match.Phase=="Results","Team elimination finishes "..mode)
+ for _,p in ipairs(players) do
+  if cfg.Practice then check(profiles[p].MatchesPlayed==0,"Practice cannot farm results")
+  else
+   check(profiles[p].MatchesPlayed==1,"Match counted exactly once")
+   check(cfg.Ranked and profiles[p].MMR~=600 or not cfg.Ranked and profiles[p].MMR==600,"Rating respects mode")
+  end
+ end
+ check(#sent>0,"Mode sends authoritative presentation events")
+ clock+=11; matches:Step(11); flush()
+ check(next(matches.Active)==nil and next(matches.ByPlayer)==nil,"Match cleans up and returns players")
+ for _,p in ipairs(players) do check(p.Parent and p.Respawns==1 or not p.Parent and p.Respawns==nil,"One lobby respawn per connected player; no respawn on disconnect") end
+end
+local originalFinish=matches.Finish
+matches.Finish=function(self,m,w) m.TestWinner=w; originalFinish(self,m,w) end
+local function timerMatch(healthA,healthB)
+ local m={Phase="Battle",EndsAt=clock,StartedAt=clock-60,Actors={},Training=false}
+ for i,health in ipairs({healthA,healthB}) do table.insert(m.Actors,{ID=tostring(i),Name="Timer"..i,Side=i,Team={1,4,7},Active=1,Health=health,Root={Position=Vector3.zero},Humanoid={Health=100},Match=m}) end
+ return m
+end
+local tied=timerMatch({100,100,100},{100,100,100}); matches:CheckWinner(tied,true)
+check(tied.SuddenDeath and tied.Phase=="Battle","Exact timer tie starts sudden death without finishing")
+local living=timerMatch({100,0,0},{1,1,0}); matches:CheckWinner(living,true)
+check(living.TestWinner==2,"Actual match timer prioritizes living creatures")
+local percentage=timerMatch({80,100,100},{100,100,100}); matches:CheckWinner(percentage,true)
+check(percentage.TestWinner==2,"Actual match timer resolves remaining HP percentage")
+local draw=timerMatch({0,0,0},{0,0,0}); matches:CheckWinner(draw,true)
+check(draw.TestWinner==0,"Simultaneous team elimination is an impartial draw")
+matches.Finish=originalFinish
 print("PASS: "..passed.." domain assertions (catalogue, economy, queue policy, persistence, input rejection)")

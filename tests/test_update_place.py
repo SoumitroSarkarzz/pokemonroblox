@@ -34,5 +34,36 @@ class PreserveStudioWork(unittest.TestCase):
             with self.assertRaises(ValueError):
                 updater.merge(input_path, output)
 
+    def test_additive_upgrade_creates_new_modules(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tree = ET.parse(ROOT / 'build/KantoArena.rbxlx')
+            shared = updater.child(updater.child(tree.getroot(), 'ReplicatedStorage'), 'Shared')
+            shared.remove(updater.child(shared, 'UITheme'))
+            working = Path(directory) / 'Old.rbxlx'
+            output = Path(directory) / 'Upgrade.rbxlx'
+            tree.write(working)
+            updater.merge(working, output)
+            updated_shared = updater.child(updater.child(ET.parse(output).getroot(), 'ReplicatedStorage'), 'Shared')
+            module = updater.child(updated_shared, 'UITheme')
+            self.assertEqual(module.attrib['class'], 'ModuleScript')
+            self.assertEqual(module.findtext("Properties/ProtectedString[@name='Source']"), (ROOT / 'src/shared/UITheme.luau').read_text())
+
+    def test_refuses_non_script_name_collision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tree = ET.parse(ROOT / 'build/KantoArena.rbxlx')
+            shared = updater.child(updater.child(tree.getroot(), 'ReplicatedStorage'), 'Shared')
+            node = updater.child(shared, 'UITheme')
+            node.attrib['class'] = 'Folder'
+            props = node.find('Properties')
+            props.remove(node.find("Properties/ProtectedString[@name='Source']"))
+            working = Path(directory) / 'Collision.rbxlx'
+            output = Path(directory) / 'Upgrade.rbxlx'
+            tree.write(working)
+            original = working.read_bytes()
+            with self.assertRaises(ValueError):
+                updater.merge(working, output)
+            self.assertFalse(output.exists())
+            self.assertEqual(working.read_bytes(), original)
+
 if __name__ == '__main__':
     unittest.main()

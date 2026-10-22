@@ -73,16 +73,25 @@ intent.OnServerEvent:Connect(function(player,action,payload)
  if type(payload)~="table" then payload={} end
  local actor=Matches.ByPlayer[player]
  if action=="Move" then if actor then Combat:Move(actor,payload.Direction,payload.Jump) end; return end
- if action=="Attack" then if actor then Combat:Attack(actor,payload.Slot,payload.Aim) end; return end
+ if action=="Attack" then
+  if actor and not Combat:Attack(actor,payload.Slot,payload.Aim) and now-(actor.LastReject or 0)>1 then actor.LastReject=now; notify(player,"Move unavailable • check cooldown or status") end
+  return
+ end
  if action=="Dash" then if actor then Combat:Dash(actor,payload.Aim) end; return end
  if action=="Guard" then if actor then Combat:Guard(actor,payload.Enabled) end; return end
- if action=="Switch" then if actor then Combat:Switch(actor,payload.Index,false) end; return end
- if action=="Potion" then if actor then Combat:Potion(actor) end; return end
+ if action=="Switch" then
+  if actor and not Combat:Switch(actor,payload.Index,false) then notify(player,"Cannot switch right now") end
+  return
+ end
+ if action=="Potion" then
+  if actor and not Combat:Potion(actor) then notify(player,"Potion unavailable • check health or remaining uses") end
+  return
+ end
  local throttle=actionAt[player] or {}; actionAt[player]=throttle
  if now-(throttle[action] or -10)<.3 then return end; throttle[action]=now
  if action=="Ready" then
   profile(player); event:FireClient(player,"Leaderboards",Boards.Cache)
-  if actor then event:FireClient(player,"Match",Matches:Snapshot(actor.Match)) end
+  if actor then event:FireClient(player,"Match",Matches:Snapshot(actor.Match,player)) end
   return
  elseif action=="LeaveMatch" then Matches:Leave(player); profile(player); return
  elseif action=="TrainingReset" and actor and actor.Match.Training then
@@ -116,6 +125,10 @@ intent.OnServerEvent:Connect(function(player,action,payload)
  elseif action=="Tutorial" then Data:Get(player).Tutorial=true; ok=true; result="Welcome to Kanto Arena"
  elseif action=="Favorite" and type(payload.ID)=="number" and payload.ID>=1 and payload.ID<=151 and payload.ID%1==0 then
   local favorites=Data:Get(player).Favorites; local key=tostring(payload.ID); favorites[key]=not favorites[key] or nil; ok=true; result="Favorites updated"
+ elseif action=="Setting" and payload.Key=="CameraShake" and ({Off=true,Low=true,Medium=true,High=true})[payload.Value] then
+  Data:Get(player).Settings.CameraShake=payload.Value; ok=true; result="Camera shake updated"
+ elseif action=="Setting" and payload.Key=="Graphics" and ({Low=true,Medium=true,High=true})[payload.Value] then
+  Data:Get(player).Settings.Graphics=payload.Value; ok=true; result="Graphics updated"
  elseif action=="Setting" and ({Music=true,Effects=true,ShiftLock=true})[payload.Key] and type(payload.Value)=="boolean" then
   Data:Get(player).Settings[payload.Key]=payload.Value; ok=true; result="Setting saved"
  end

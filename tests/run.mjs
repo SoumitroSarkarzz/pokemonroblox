@@ -17,10 +17,10 @@ try {
  for(const file of sources) state.loadstring(await readFile(file,'utf8'),relative(root,file),true);
  console.log(`PASS: ${sources.length} Luau sources compile`);
  let harness=await readFile(join(root,'tests/prelude.luau'),'utf8');
- for(const name of ['Kanto','Config','Rules','PokemonDatabase','AbilityDatabase','PokemonModelSettings']) {
+ for(const name of ['Kanto','Config','Rules','PokemonDatabase','MoveDatabase','AbilityDatabase','PokemonModelSettings']) {
   harness+=`\nmodules["${name}"]=(function()\n${await readFile(join(root,`src/shared/${name}.luau`),'utf8')}\nend)()\n`;
  }
- for(const name of ['EconomyService','MatchmakingService','CombatService','MatchService','DataService','LeaderboardService']) {
+ for(const name of ['EconomyService','MatchmakingService','CombatService','MatchService','DataService','LeaderboardService','BotService']) {
   harness+=`\nmodules["${name}"]=(function()\n${await readFile(join(root,`src/server/${name}.luau`),'utf8')}\nend)()\n`;
  }
  harness+=await readFile(join(root,'tests/spec.luau'),'utf8');

@@ -6,6 +6,7 @@ Always writes a separate file and refuses to overwrite an existing output.
 """
 from pathlib import Path
 import sys
+import hashlib
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +39,14 @@ def merge(input_path, output_path):
             try:
                 node = child(group, name)
             except ValueError:
-                raise ValueError(f'{name} is absent. Add the new module in Studio before merging.')
+                reference = 'RBXUpgrade' + hashlib.sha256(str(file.relative_to(ROOT)).encode()).hexdigest()[:20]
+                if any(item.attrib.get('referent') == reference for item in root.iter('Item')):
+                    raise ValueError(f'Conflicting generated reference for {name}')
+                cls = 'Script' if file.name.endswith('.server.luau') else 'LocalScript' if file.name.endswith('.client.luau') else 'ModuleScript'
+                node = ET.SubElement(group, 'Item', {'class': cls, 'referent': reference})
+                props = ET.SubElement(node, 'Properties')
+                ET.SubElement(props, 'string', name='Name').text = name
+                ET.SubElement(props, 'ProtectedString', name='Source')
             source = node.find("Properties/ProtectedString[@name='Source']")
             if source is None:
                 raise ValueError(f'No Source property on {name}')
