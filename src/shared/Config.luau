@@ -1,0 +1,33 @@
+return {
+ Version = 1,
+ DataStore = "KantoArena_v1",
+ LeaseSeconds = 180, SaveInterval = 50,
+ QueueCountdown = 10, PreviewSeconds = 3, SwitchSeconds = 1,
+ MaxSwitches = 2, PotionHeal = 25, PotionSeconds = 1.2,
+ Modes = {
+  Casual1 = {Label="CASUAL 1V1", Size=1, Ranked=false, Duration=300},
+  Ranked1 = {Label="RANKED 1V1", Size=1, Ranked=true, Duration=300},
+  Casual2 = {Label="CASUAL 2V2", Size=2, Ranked=false, Duration=420},
+  Ranked2 = {Label="RANKED 2V2", Size=2, Ranked=true, Duration=420},
+  Casual3 = {Label="CASUAL 3V3", Size=3, Ranked=false, Duration=480},
+  Ranked3 = {Label="RANKED 3V3", Size=3, Ranked=true, Duration=480},
+  Practice = {Label="PRACTICE VS BOTS", Size=1, Ranked=false, Duration=300, Practice=true},
+ },
+ Rarities = {"Common","Uncommon","Rare","Epic","Legendary","Mythic"},
+ RarityColors = {
+  Common=Color3.fromRGB(180,195,204), Uncommon=Color3.fromRGB(78,220,145),
+  Rare=Color3.fromRGB(65,165,255), Epic=Color3.fromRGB(177,110,255),
+  Legendary=Color3.fromRGB(255,195,65), Mythic=Color3.fromRGB(255,85,150),
+ },
+ StarterPool = {1,4,7,10,16,19,25,29,32,43,60,74},
+ Crates = {
+  Starter = {Price=0, Weights={Common=1}},
+  Basic = {Price=200, Weights={Common=65,Uncommon=25,Rare=9,Epic=1}},
+  Rare = {Price=650, Weights={Uncommon=50,Rare=40,Epic=9,Legendary=1}},
+  Event = {Price=1200, Weights={Rare=65,Epic=28,Legendary=6,Mythic=1}},
+ },
+ MapThemes = {"Grassland Stadium","Volcanic Arena","Frozen Temple","Neon City Rooftop","Ancient Ruins","Floating Sky Arena"},
+ BotDifficulties = {Easy={Interval=1.5,Range=6}, Normal={Interval=.8,Range=10}, Hard={Interval=.45,Range=15}, Expert={Interval=.25,Range=20}},
+ AnimationNames = {"Idle","Walk","Run","Jump","Fall","Land","Dash","M1_1","M1_2","M1_3","M1_4","Ability1","Ability2","Ability3","Ability4","Hit","Knockback","Defeat","Spawn","SwitchIn","SwitchOut","Victory"},
+ SoundNames = {"Spawn","Attack","Ability1","Ability2","Ability3","Ability4","Hit","Defeat"},
+}

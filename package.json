@@ -1,0 +1,14 @@
+{
+  "name": "kanto-arena",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "python3 tools/build.py",
+    "test": "node tests/run.mjs",
+    "test:place": "python3 tools/verify_place.py && python3 tests/test_update_place.py",
+    "setup": "python3 tools/install_tools.py && npm run build && npm test && npm run test:place"
+  },
+  "devDependencies": {
+    "luau-web": "1.5.1"
+  }
+}
